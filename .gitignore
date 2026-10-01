@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+.env.*
+
+# Logs
+*.log
+
+# Model checkpoints / weights
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Tokenizers / generated artifacts
+*.json
+
+# Datasets
+data/
+datasets/
+
+# Experiment outputs
+runs/
+outputs/
+checkpoints/
+wandb/
+
+# Kaggle
+.kaggle/
+
+# Temporary files
+*.tmp
+*.temp
