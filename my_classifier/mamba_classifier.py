@@ -21,7 +21,7 @@ class MambaClassifier(nn.Module):
 
         self.classifier = nn.Linear(embedding_dim, num_classes)
 
-        def forward(self, x, lenghts):
+    def forward(self, x, lenghts):
 
             # [B,S] -> [B,S,D]
             embedded = self.embedding(x)
