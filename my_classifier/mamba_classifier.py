@@ -5,7 +5,12 @@ from torch import nn
 
 class MambaClassifier(nn.Module):
     def __init__(
-        self, vocab_size, embedding_dim=128, d_state=32, headdim=32, num_classes=2
+        self,
+        vocab_size,
+        embedding_dim=128,
+        d_state=32,
+        headdim=32,
+        num_classes=2
     ):
         super().__init__()
 
@@ -16,27 +21,70 @@ class MambaClassifier(nn.Module):
             d_state=d_state,
             headdim=headdim,
             is_mimo=False,
-            dtype=torch.float32,
+            dtype=torch.float32
         )
 
         self.classifier = nn.Linear(embedding_dim, num_classes)
 
-    def forward(self, x, lenghts):
+    def forward(self, x, lengths):
+        embedded = self.embedding(x)
 
-            # [B,S] -> [B,S,D]
-            embedded = self.embedding(x)
+        features = self.mamba(embedded)
 
-            # [B,S,D] -> [B,S,D]
-            features = self.mamba(embedded, lenghts)
+        batch_size = features.size(0)
 
-            batch_size = features.size(0)
+        last_indices = lengths - 1
 
-            last_indices = lenghts - 1 # element-wise!
+        batch_indices = torch.arange(
+            batch_size,
+            device=features.device
+        )
 
-            back_indices = torch.arange(batch_size, device=features.device)
+        final_features = features[
+            batch_indices,
+            last_indices
+        ]
 
-            final_features = features[back_indices, last_indices]
+        logits = self.classifier(final_features)
 
-            # [B,D] -> [B,C]
-            logits = self.classifier(final_features)
-            return logits
+        return logits
+
+    def load_weights(self, path):
+        device = next(self.parameters()).device
+
+        state_dict = torch.load(
+            path,
+            map_location=device
+        )
+
+        self.load_state_dict(state_dict)
+
+        return self
+
+
+    def predict_sentiment(self, text, tokenizer):
+        self.eval()
+
+        device = next(self.parameters()).device
+
+        input_ids = tokenizer.encode(text)
+
+        input_tensor = torch.tensor(
+            input_ids,
+            dtype=torch.long
+        ).unsqueeze(0).to(device)
+
+        lengths = torch.tensor(
+            [len(input_ids)],
+            dtype=torch.long
+        ).to(device)
+
+        with torch.no_grad():
+            logits = self(input_tensor, lengths)
+
+            predicted_class = torch.argmax(
+                logits,
+                dim=1
+            ).item()
+
+        return "Positive" if predicted_class == 1 else "Negative"
