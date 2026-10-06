@@ -1,352 +1,259 @@
-# LSTM vs Mamba for Sentiment Classification
+# LSTM vs. Mamba for IMDB Sentiment Classification
 
-An educational and experimental project for studying and comparing **LSTM** and **Mamba** sequence models on the **IMDB 50K movie review sentiment classification** task.
+This project compares two sequence models for binary sentiment classification on the IMDB movie-review dataset:
 
-The main goal of this project is not only to achieve high accuracy, but to understand how different sequence modeling architectures process sequential data while keeping the surrounding data pipeline as consistent as possible.
+- LSTM baseline: implemented in `train_lstm.ipynb`
+- Mamba model: implemented in `train_mamba.ipynb`
+
+Both notebooks use the same dataset, tokenizer, embedding size, training pipeline, and evaluation protocol so the architectural difference is isolated as much as possible.
 
 ---
 
-## Project Goal
+## Project goal
 
-This project follows a simple experimental question:
+The central question is:
 
-> **How does Mamba compare with an LSTM for sequence classification when both models use the same dataset, tokenizer, embedding setup, training pipeline, and evaluation procedure?**
+> How does a standard LSTM compare with a Mamba-based sequence model when both are trained on the same IMDB data and evaluated under the same conditions?
 
-The project starts with an LSTM baseline and will later introduce Mamba while keeping the rest of the pipeline as consistent as possible.
+The repository keeps the data pipeline fixed and swaps only the sequence encoder, making it a fair experimental comparison rather than a completely different training setup.
 
 ---
 
 ## Dataset
 
-The project uses the  **IMDB Dataset of 50K Movie Reviews** .
+The project uses the IMDB sentiment dataset with 50,000 movie reviews.
 
-* Total samples: **50,000**
-* Positive reviews: **25,000**
-* Negative reviews: **25,000**
-* Task: Binary sentiment classification
+- Total reviews: 50,000
+- Positive: 25,000
+- Negative: 25,000
+- Task: binary sentiment classification
 
-Current split:
+The notebooks split the data into:
 
-| Split           |          Samples |
-| --------------- | ---------------: |
-| Train           |           40,000 |
-| Validation      |            5,000 |
-| Test            |            5,000 |
-| **Total** | **50,000** |
+| Split | Samples |
+| --- | ---: |
+| Train | 40,000 |
+| Validation | 5,000 |
+| Test | 5,000 |
 
-The dataset is split using stratified sampling with a fixed random seed.
+The split is stratified and fixed for consistent comparison across experiments.
 
 ---
 
-## Pipeline
+## Data pipeline
+
+The pipeline is shared across both models:
 
 ```text
-IMDB 50K
-   │
-   ▼
-Text Preprocessing
-   │
-   ▼
-Train / Validation / Test Split
-   │
-   ▼
-Tokenizer
-   │
-   ▼
-Token IDs
-   │
-   ▼
-Dynamic Padding
-   │
-   ▼
-Embedding
-   │
-   ├───────────────┐
-   ▼               ▼
-  LSTM            Mamba
-   │               │
-   ▼               ▼
-Sequence Representation
-   │               │
-   └───────┬───────┘
-           ▼
-       Classifier
-           │
-           ▼
-         Logits
-           │
-           ▼
-     Cross Entropy Loss
-           │
-           ▼
-       Backpropagation
+IMDB reviews
+  -> preprocess and clean text
+  -> stratified train/validation/test split
+  -> word-level tokenizer trained on training split only
+  -> token IDs + dynamic padding
+  -> embedding layer
+  -> sequence encoder (LSTM or Mamba)
+  -> classifier head
+  -> CrossEntropyLoss
+  -> optimization and evaluation
 ```
 
----
-
-## Project Structure
+The custom tokenizer and dataset utilities are defined under:
 
 ```text
-lstm-vs-mamba/
-│
-├── my_tokenizers/
-│   ├── base_tokenizer.py
-│   ├── word_level_tokenizer.py
-│   └── text_tokenizer.py
-│
+my_tokenizers/
+my_datasets/
+my_trainers/
+my_classifier/
+```
+
+The notebook training flow includes:
+
+1. load the IMDB dataset
+2. create the train/validation/test split
+3. train a word-level tokenizer on the training data
+4. build PyTorch datasets and dataloaders
+5. define the model
+6. optimize with Adam
+7. train for 5 epochs
+8. evaluate on validation and test sets
+9. save the trained model and tokenizer
+
+---
+
+## Project structure
+
+```text
+mamba-imdb/
+├── train_lstm.ipynb
+├── train_mamba.ipynb
+├── my_classifier/
+│   ├── __init__.py
+│   ├── lstm_classifier.py
+│   └── mamba_classifier.py
 ├── my_datasets/
 │   ├── imdb_dataset.py
 │   └── imdb_torch_dataset.py
-│
-├── my_classifier/
-│   └── lstm_classifier.py
-│
+├── my_tokenizers/
+│   ├── base_tokenizer.py
+│   ├── text_tokenizer.py
+│   └── word_level_tokenizer.py
 ├── my_trainers/
 │   └── trainer.py
-│
-├── train.ipynb
-│
-├── README.md
-├── requirements.txt
-├── .gitignore
-└── LICENSE
+├── imdb_tokenizer.json
+├── mamba_imdb_tokenizer.json
+├── lstm_imdb.pt
+├── mamba_imdb.pt
+├── readme.md
+└── .gitignore
 ```
 
 ---
 
-## Tokenization
+## Model implementations
 
-The project uses a custom tokenizer abstraction so that different tokenization strategies can be introduced without changing the rest of the training pipeline.
+### 1) LSTM baseline
 
-Current tokenizer:
-
-**Word-Level Tokenization**
-
-The tokenizer is trained **only on the training split** to avoid vocabulary leakage from validation and test data.
-
-Special tokens:
-
-```text
-<PAD>
-<UNK>
-```
-
-The tokenizer is responsible for:
-
-* Training the vocabulary
-* Tokenization
-* Encoding text into token IDs
-* Decoding token IDs back into text
-* Providing vocabulary size
-* Providing the padding token ID
-
----
-
-## Dataset Pipeline
-
-The dataset is represented using a custom PyTorch `Dataset`.
-
-Each sample contains:
-
-```python
-{
-    "input_ids": [...],
-    "label": 0 or 1
-}
-```
-
-Because reviews have different lengths, batches use  **dynamic padding** .
-
-The DataLoader produces:
-
-```text
-input_ids : [B, S]
-lengths   : [B]
-labels    : [B]
-```
-
-where:
-
-* `B` = batch size
-* `S` = maximum sequence length in the batch
-
----
-
-## LSTM Baseline
-
-The first sequence model is a single-layer LSTM.
+The LSTM notebook defines a single-layer LSTM classifier.
 
 Architecture:
 
 ```text
-Token IDs
-   │
-   ▼
-Embedding
-   │
-   ▼
-LSTM
-   │
-   ▼
-Final Hidden State
-   │
-   ▼
-Linear Classifier
-   │
-   ▼
-2 Classes
+Embedding(20000, 128)
+  -> LSTM(128, 128, batch_first=True)
+  -> final hidden state
+  -> Linear(128, 2)
 ```
 
-Current configuration:
+Key setup from `train_lstm.ipynb`:
+
+- embedding dimension: 128
+- hidden dimension: 128
+- number of classes: 2
+- loss: `nn.CrossEntropyLoss()`
+- optimizer: `torch.optim.Adam(model.parameters(), lr=1e-3)`
+- training epochs: 5
+- padding handled with `pack_padded_sequence`
+
+### 2) Mamba classifier
+
+The Mamba notebook uses a Mamba state-space block from `mamba_ssm`.
+
+Architecture:
 
 ```text
-Embedding dimension : 128
-Hidden dimension    : 128
-LSTM layers         : 1
-Number of classes   : 2
+Embedding(20000, 128, padding_idx=0)
+  -> Mamba3(d_model=128, d_state=64, headdim=32)
+  -> mean-pooled real-token features
+  -> Linear(128, 64) -> GELU -> Dropout(0.2) -> Linear(64, 2)
 ```
 
-Packed sequences are used so that padding tokens do not participate in the LSTM computation.
+Key setup from `train_mamba.ipynb`:
+
+- embedding dimension: 128
+- Mamba state size: 64
+- Mamba head dim: 32
+- dropout: 0.2
+- loss: `nn.CrossEntropyLoss()`
+- optimizer: `torch.optim.Adam(model.parameters(), lr=5e-4)`
+- training epochs: 5
+- padding-aware masking and mean pooling for sequence summarization
 
 ---
 
-## Initial LSTM Results
+## Training summary
 
-After 5 training epochs:
+Both notebooks train with the same data split and evaluation logic through the shared `Trainer` class in `my_trainers/trainer.py`.
 
-| Epoch | Train Loss | Train Accuracy | Validation Loss | Validation Accuracy |
-| ----: | ---------: | -------------: | --------------: | ------------------: |
-|     1 |     0.5721 |         69.45% |          0.4968 |              76.90% |
-|     2 |     0.4798 |         77.04% |          0.4401 |              80.60% |
-|     3 |     0.3146 |         87.00% |          0.2917 |              87.86% |
-|     4 |     0.2165 |         91.70% |          0.2654 |              89.04% |
-|     5 |     0.1651 |         94.03% |          0.2617 |    **89.44%** |
+The trainer reports:
 
-The test set has not been used during model selection.
-
----
-
-## Model Comparison
-
-The experiment will progressively compare sequence modeling architectures under a shared pipeline.
-
-| Component  | LSTM          | Mamba         |
-| ---------- | ------------- | ------------- |
-| Dataset    | IMDB 50K      | IMDB 50K      |
-| Tokenizer  | Word-Level    | Word-Level    |
-| Vocabulary | Same          | Same          |
-| Embedding  | 128           | 128           |
-| Classifier | Linear        | Linear        |
-| Loss       | Cross Entropy | Cross Entropy |
-| Optimizer  | Same          | Same          |
-| Evaluation | Same          | Same          |
-
-The goal is to change the **sequence modeling component** while keeping the surrounding experiment as consistent as possible.
+- training loss
+- training accuracy
+- validation loss
+- validation accuracy
+- test loss
+- test accuracy
 
 ---
 
-## Installation
+## Results
 
-Create a Python environment and install the required dependencies.
+### LSTM results
 
-```bash
-pip install -r requirements.txt
-```
+The LSTM notebook reached these validation metrics over 5 training epochs:
 
-The project currently uses:
+| Epoch | Train Loss | Train Acc | Val Loss | Val Acc |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.5663 | 0.7015 | 0.4625 | 0.7864 |
+| 1 | 0.3528 | 0.8425 | 0.2578 | 0.8960 |
+| 2 | 0.2016 | 0.9223 | 0.2343 | 0.9062 |
+| 3 | 0.1353 | 0.9517 | 0.2412 | 0.9068 |
+| 4 | 0.0835 | 0.9729 | 0.2960 | 0.9036 |
 
-* Python
-* PyTorch
-* Hugging Face Tokenizers
-* Pandas
-* NumPy
-* KaggleHub
-* tqdm
-* scikit-learn
+Final test result:
 
-Mamba dependencies will be added when the Mamba experiment is introduced.
+- Test Loss: 0.2902
+- Test Accuracy: 0.9054
 
----
+### Mamba results
 
-## Running the Project
+The Mamba notebook reached these validation metrics over 5 training epochs:
 
-Open:
+| Epoch | Train Loss | Train Acc | Val Loss | Val Acc |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.4173 | 0.8059 | 0.3134 | 0.8680 |
+| 1 | 0.2457 | 0.9020 | 0.2679 | 0.8892 |
+| 2 | 0.1502 | 0.9456 | 0.2817 | 0.8928 |
+| 3 | 0.0727 | 0.9750 | 0.3766 | 0.8878 |
+| 4 | 0.0320 | 0.9890 | 0.4839 | 0.8854 |
 
-```text
-train.ipynb
-```
+Final test result:
 
-and run the notebook cells sequentially.
+- Test Loss: 0.4878
+- Test Accuracy: 0.8892
 
-The notebook currently:
+### Comparison
 
-1. Downloads the IMDB dataset
-2. Preprocesses the reviews
-3. Creates train/validation/test splits
-4. Trains the tokenizer on the training set
-5. Creates PyTorch datasets and dataloaders
-6. Builds the LSTM classifier
-7. Trains the model
-8. Evaluates the model on the validation set
-9. Saves the trained model and tokenizer
+| Model | Best Validation Accuracy | Test Accuracy |
+| --- | ---: | ---: |
+| LSTM | 0.9068 | 0.9054 |
+| Mamba | 0.8928 | 0.8892 |
 
----
-
-## Model Saving
-
-The trained model parameters are saved using PyTorch's `state_dict`.
-
-```python
-torch.save(model.state_dict(), "lstm_imdb.pt")
-```
-
-The tokenizer is saved separately because the token-to-ID mapping must remain identical when loading the model.
+Under this experimental setup, the LSTM baseline performs slightly better than the Mamba model in validation and test accuracy, while the Mamba model reaches strong accuracy quickly and trains competitively.
 
 ---
 
-## Future Work
+## Benchmark note
 
-Planned experiments:
+The notebooks also include a simple benchmark-style evaluation on a small sample set. The reported benchmark accuracies in the notebooks are:
 
-* [ ] Add Mamba sequence classifier
-* [ ] Train Mamba using the same pipeline
-* [ ] Compare LSTM and Mamba validation/test performance
-* [ ] Compare parameter counts
-* [ ] Compare training time
-* [ ] Compare inference time
-* [ ] Investigate sequence length effects
-* [ ] Analyze difficult examples and failure cases
-* [ ] Add confusion matrices and additional evaluation metrics
-* [ ] Experiment with different Mamba configurations
-* [ ] Add experiment tracking
+- LSTM benchmark accuracy: 62.50%
+- Mamba benchmark accuracy: 57.50%
+
+These benchmark values are part of the exploratory validation workflow and are not the primary comparison metric for the full test set.
 
 ---
 
-## Learning Objectives
+## Reproduction
 
-This project is also designed as a practical study of:
+To reproduce the experiments:
 
-* Sequence modeling
-* Tokenization
-* Embeddings
-* LSTM
-* State Space Models
-* Mamba
-* PyTorch training loops
-* Dynamic batching and padding
-* Model evaluation
-* Fair architectural comparisons
+1. open `train_lstm.ipynb` or `train_mamba.ipynb`
+2. run the cells in order
+3. the notebook will load the dataset, train the tokenizer, build the model, train, evaluate, and save the weights
+
+The trained artifacts are stored as:
+
+- `lstm_imdb.pt` + `imdb_tokenizer.json`
+- `mamba_imdb.pt` + `mamba_imdb_tokenizer.json`
 
 ---
 
-## Status
+## Current status
 
-**Current status: LSTM baseline completed.**
-
-The next stage is implementing the Mamba classifier while preserving the existing data and training pipeline.
+This repository contains completed LSTM and Mamba training experiments for the IMDB text-classification task. The code and results currently show that the LSTM setup is the stronger performer in this controlled comparison, while the Mamba model remains a valid and competitive alternative.
 
 ---
 
 ## License
 
-This project is licensed under the MIT License.
+This project is distributed under the MIT license.
